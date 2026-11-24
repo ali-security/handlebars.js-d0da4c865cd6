@@ -297,7 +297,7 @@ describe('Regressions', function() {
     it('should compile and execute templates', function() {
       var newHandlebarsInstance = Handlebars.create();
 
-      registerTemplate(newHandlebarsInstance);
+      registerTemplate(newHandlebarsInstance, compiledTemplateVersion7());
       newHandlebarsInstance.registerHelper('loud', function(value) {
         return value.toUpperCase();
       });
@@ -309,18 +309,38 @@ describe('Regressions', function() {
       var newHandlebarsInstance = Handlebars.create();
 
       shouldThrow(function() {
-        registerTemplate(newHandlebarsInstance);
+        registerTemplate(newHandlebarsInstance, compiledTemplateVersion7());
         newHandlebarsInstance.templates['test.hbs']({});
       }, Handlebars.Exception, 'Missing helper: "loud"');
     });
 
-    // This is a only slightly modified precompiled templated from compiled with 4.2.1
-    function registerTemplate(Handlebars) {
+    it('should pass "options.lookupProperty" to "lookup"-helper, even with old templates', function() {
+      var newHandlebarsInstance = Handlebars.create();
+      registerTemplate(newHandlebarsInstance, compiledTemplateVersion7_usingLookupHelper());
+
+      newHandlebarsInstance.templates['test.hbs']({});
+
+      expect(newHandlebarsInstance.templates['test.hbs']({property: 'a', test: {a: 'b'}})).to.equal('b');
+    });
+
+    function registerTemplate(Handlebars, compileTemplate) {
       var template = Handlebars.template, templates = Handlebars.templates = Handlebars.templates || {};
-      templates['test.hbs'] = template({'compiler': [7, '>= 4.0.0'], 'main': function(container, depth0, helpers, partials, data) {
+      templates['test.hbs'] = template(compileTemplate);
+    }
+
+    // This is a only slightly modified precompiled templated from compiled with 4.2.1
+    function compiledTemplateVersion7() {
+      return {'compiler': [7, '>= 4.0.0'], 'main': function(container, depth0, helpers, partials, data) {
           return container.escapeExpression((helpers.loud || (depth0 && depth0.loud) || helpers.helperMissing).call(depth0 != null ? depth0 : (container.nullContext || {}), (depth0 != null ? depth0.name : depth0), {'name': 'loud', 'hash': {}, 'data': data}))
               + '\n\n';
-        }, 'useData': true});
+        }, 'useData': true};
+    }
+
+    function compiledTemplateVersion7_usingLookupHelper() {
+      // This is the compiled version of "{{lookup test property}}"
+      return {'compiler': [7, '>= 4.0.0'], 'main': function(container, depth0, helpers, partials, data) {
+          return container.escapeExpression(helpers.lookup.call(depth0 != null ? depth0 : (container.nullContext || {}), (depth0 != null ? depth0.test : depth0), (depth0 != null ? depth0.property : depth0), {'name': 'lookup', 'hash': {}, 'data': data}));
+        }, 'useData': true};
     }
   });
 
@@ -333,5 +353,14 @@ describe('Regressions', function() {
     };
 
     shouldCompileTo('{{helpa length="foo"}}', [obj, helpers], 'foo');
+  });
+
+  describe("GH-1639: TypeError: Cannot read property 'apply' of undefined\" when handlebars version > 4.6.0 (undocumented, deprecated usage)", function() {
+    it('should treat undefined helpers like non-existing helpers', function() {
+      expectTemplate('{{foo}}')
+        .withHelper('foo', undefined)
+        .withInput({ foo: 'bar' })
+        .toCompileTo('bar');
+    });
   });
 });
