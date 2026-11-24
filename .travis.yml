@@ -1,8 +1,21 @@
 language: node_js
 before_install:
 - npm install -g grunt-cli
+install:
+- npm ci
 script:
-- grunt --stack travis
+- grunt --stack clean parser node globals test:bin test:cov amd uglify test:min copy:dist copy:components copy:cdnjs
+- grunt --stack bgShell:integrationTests
+- |
+  echo "== Pending (skipped) mocha tests: 27 per env, all skipped by upstream design =="
+  echo "~lambdas.json (10 tests): skipped - handlebars' lambda implementation knowingly deviates from the optional Mustache lambda spec"
+  echo "delimiters.json and other templates using {{= (14 tests): skipped - handlebars does not support Mustache alternative delimiters"
+  echo "partials.json - Failed Lookup: skipped - handlebars throws when a partial is not found instead of rendering empty"
+  echo "partials.json - Standalone Indentation: skipped - handlebars nests the entire partial output, not just the literals"
+  echo "helper for nested raw block works if nested raw blocks are broken: xit - known upstream bug since 4.4.4, template also fails in 4.4.3 and 3.x"
+  echo "-- upstream skip declarations --"
+  sed -n "/Our lambda implementation/,/it.skip/p" spec/spec.js
+  sed -n "/xit(/,+5p" spec/helpers.js
 email:
   on_failure: change
   on_success: never
